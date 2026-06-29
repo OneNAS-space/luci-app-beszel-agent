@@ -2,17 +2,13 @@
 	"luci-app-beszel-agent": {
 		"description": "Grant access to Beszel Agent configuration and service",
 		"read": {
-			"uci": [ "beszel-agent" ],
-			"file": {
-				"/etc/config/beszel-agent": [ "read" ]
-			}
+			"ubus": {
+				"service": [ "list" ]
+			},
+			"uci": [ "beszel-agent" ]
 		},
 		"write": {
-			"uci": [ "beszel-agent" ],
-			"file": {
-				"/etc/config/beszel-agent": [ "write" ]
-			},
-			"service": [ "beszel-agent" ]
+			"uci": [ "beszel-agent" ]
 		}
 	}
 }
