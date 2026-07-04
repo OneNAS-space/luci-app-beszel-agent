@@ -71,7 +71,7 @@ return view.extend({
 		]);
 	},
 
-	async render([isRunning]) {
+	async render([isRunning, versionText]) {
 		const map = new form.Map('beszel-agent', _('Beszel Agent'),
 			_('Lightweight server monitoring hub with Docker support.'));
 
