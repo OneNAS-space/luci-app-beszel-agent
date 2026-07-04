@@ -6,11 +6,9 @@ on:
   push:
     branches:
       - main
-    paths-ignore:
-      - '.github/**'
-      - 'README.md'
-      - 'LICENSE'
-      - 'SECURITY.md'
+    paths:
+      - 'Makefile'
+      - '!**/.github/**'
   workflow_dispatch:
 
 jobs:
@@ -18,59 +16,26 @@ jobs:
     name: 1. Resolve Version
     runs-on: ubuntu-latest
     outputs:
-      should_build: ${{ steps.check_release.outputs.should_build }}
-      tag_name: ${{ steps.version.outputs.tag_name }}
-      main_version: ${{ steps.version.outputs.main_version }}
-      
+      resolved_tag: ${{ steps.resolve.outputs.version }}
+      pkg_version: ${{ steps.resolve.outputs.pkg_version }}
+      pkg_release: ${{ steps.resolve.outputs.pkg_release }}
+      should_build: "true"
     steps:
-      - name: 🧾 Checkout repo
-        uses: actions/checkout@v7
-
-      - name: 🏷️ Extract version info from Git Commit
-        id: version
+      - name: 🧾 Generate Dynamic Version
+        id: resolve
         run: |
-          set -euo pipefail
-
-          COMMIT_SHA=$(git rev-parse --short=7 HEAD)
-
-          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
-            echo "Manual trigger detected. Using current time to force unique version."
-            BASE_TIMESTAMP=$(date +%s)
-          else
-            BASE_TIMESTAMP=$(git log -1 --format=%ct)
-          fi
-
-          PKG_VERSION_DATE=$(date -u -d "@${BASE_TIMESTAMP}" +'%y.%j')
-          PKG_VERSION_SECS=$(printf "%05d" $(( BASE_TIMESTAMP % 86400 )))
-          OFFICIAL_VERSION="${PKG_VERSION_DATE}.${PKG_VERSION_SECS}~${COMMIT_SHA}"
-          GIT_TAG_VERSION="${PKG_VERSION_DATE}.${PKG_VERSION_SECS}"
-
-          echo "tag_name=v${GIT_TAG_VERSION}" >> "$GITHUB_OUTPUT"
-          echo "main_version=${OFFICIAL_VERSION}" >> "$GITHUB_OUTPUT"
-
-      - name: 🧐 Check if release exists
-        id: check_release
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAG: ${{ steps.version.outputs.tag_name }}
-        run: |
-          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
-            echo "Manual run detected. Forcing build."
-            echo "should_build=true" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          if gh release view "$TAG" > /dev/null 2>&1; then
-            echo "Release $TAG already exists. Skipping build."
-            echo "should_build=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "Release $TAG does not exist. Proceeding with build."
-            echo "should_build=true" >> "$GITHUB_OUTPUT"
-          fi
+          PKG_VERSION=$(date -u +'%y.%j')
+          PKG_RELEASE=$(date -u +'%s' | cut -c6-10)
+          FULL_VER="v${PKG_VERSION}-r${PKG_RELEASE}"
+          
+          echo "Generated version: $FULL_VER"
+          echo "version=$FULL_VER" >> "$GITHUB_OUTPUT"
+          echo "pkg_version=$PKG_VERSION" >> "$GITHUB_OUTPUT"
+          echo "pkg_release=$PKG_RELEASE" >> "$GITHUB_OUTPUT"
 
   build:
-    name: Build for ${{ matrix.version }} / ${{ matrix.target }}
+    name: 2. Build for ${{ matrix.version }} / ${{ matrix.target }}
     needs: check
-    if: needs.check.outputs.should_build == 'true'
     runs-on: ubuntu-latest
 
     strategy:
@@ -85,16 +50,19 @@ jobs:
       - name: 🧾 Checkout repo
         uses: actions/checkout@v7
 
-      - name: 📛 Set PKG_NAME from repo
-        run: echo "PKG_NAME=${{ github.event.repository.name }}" >> "$GITHUB_ENV"
+      - name: 📛 Set Environment
+        run: |
+          echo "PKG_NAME=${{ github.event.repository.name }}" >> "$GITHUB_ENV"
+          echo "ARCH=${{ matrix.target }}-${{ matrix.version }}" >> "$GITHUB_ENV"
 
-      - name: 🧰 Set up Feed structure
+      - name: 🧰 Set up luci-app-beszel-agent feed structure
         run: |
           set -e
           mkdir -p package
           printf 'include $(TOPDIR)/feeds/luci/luci.mk\n' > package/luci.mk
 
           mkdir -p feed/luci/applications/${PKG_NAME}
+
           mkdir -p feed/luci
           printf 'include $(TOPDIR)/feeds/luci/luci.mk\n' > feed/luci/luci.mk
 
@@ -102,31 +70,35 @@ jobs:
             --exclude='.git' \
             --exclude='feed' \
             --exclude='.github' \
-            --exclude='patches' \
-            --exclude='SECURITY.md' \
-            --exclude='README.md' \
-            --exclude='.upstream_meta' \
-            --exclude='.official_json_version' \
             ./ feed/luci/applications/${PKG_NAME}/
 
       - name: 🩹 Patch Makefile with dynamic version
         id: patch_version
         run: |
           set -euo pipefail
-          OFFICIAL_VERSION="${{ needs.check.outputs.main_version }}"
-          echo "🚀 Using official standard version: ${OFFICIAL_VERSION}"
+          V="${{ needs.check.outputs.pkg_version }}"
+          R="${{ needs.check.outputs.pkg_release }}"
+
+          echo "Using version: ${V}-r${R}"
 
           MF="feed/luci/applications/${PKG_NAME}/Makefile"
+
           sed -i '/^PKG_VERSION/d' "$MF"
           sed -i '/^PKG_RELEASE/d' "$MF"
-          sed -i "/^PKG_NAME/a PKG_RELEASE:=1" "$MF"
-          sed -i "/^PKG_NAME/a PKG_VERSION:=${OFFICIAL_VERSION}" "$MF"
-
-          echo "✅ Patched Makefile metadata:"
-          grep -E 'PKG_VERSION|PKG_RELEASE' "$MF"
-          
-      - name: 🧮 Compute ARCH
-        run: echo "ARCH=${{ matrix.target }}-${{ matrix.version }}" >> "$GITHUB_ENV"
+          if grep -q '^PKG_NAME' "$MF"; then
+            echo "Found PKG_NAME, inserting after it"
+            sed -i "/^PKG_NAME/a PKG_RELEASE:=${R}" "$MF"
+            sed -i "/^PKG_NAME/a PKG_VERSION:=${V}" "$MF"
+          elif grep -q '^LUCI_NAME' "$MF"; then
+            echo "Found LUCI_NAME, inserting after it"
+            sed -i "/^LUCI_NAME/a PKG_RELEASE:=${R}" "$MF"
+            sed -i "/^LUCI_NAME/a PKG_VERSION:=${V}" "$MF"
+          else
+            echo "PKG_VERSION:=${V}" > "$MF.tmp"
+            echo "PKG_RELEASE:=${R}" >> "$MF.tmp"
+            cat "$MF" >> "$MF.tmp"
+            mv "$MF.tmp" "$MF"
+          fi
 
       - name: 🏗️ Build with OpenWrt SDK
         uses: openwrt/gh-action-sdk@v11
@@ -138,18 +110,27 @@ jobs:
           FEED_DIR: ${{ github.workspace }}/feed
           NO_SHFMT_CHECK: 1
           NO_REFRESH_CHECK: 1
+          
+      - name: 🔍 Debug build output
+        run: |
+          echo "=== bin directory structure ==="
+          ls -la bin/ 2>/dev/null || echo "No bin directory found"
+          if [ -d "bin/packages" ]; then
+            echo "=== Full packages directory tree ==="
+            ls -laR bin/packages/ 2>/dev/null || echo "No packages directory"
+          fi
 
-      - name: 📦 Upload artifact
+      - name: 📦 Upload artifact for ${{ matrix.target }}
         uses: actions/upload-artifact@v7
         with:
           name: ${{ env.PKG_NAME }}-${{ matrix.target }}-${{ matrix.version }}
-          path: bin/packages/*/jackie264/${{ env.PKG_NAME }}*.apk
+          path: |
+            bin/packages/*/jackie264/${{ env.PKG_NAME }}*.apk
           if-no-files-found: ignore
 
   release:
     name: 3. Release & Deploy ${{ github.repository }}
     needs: [check, build]
-    if: needs.check.outputs.should_build == 'true'
     runs-on: ubuntu-latest
 
     steps:
@@ -164,9 +145,10 @@ jobs:
       - name: 🗃️ Create GitHub Release
         uses: softprops/action-gh-release@v3
         with:
-          tag_name: ${{ needs.check.outputs.tag_name }}
-          name: Build-${{ needs.check.outputs.tag_name }}
-          files: ./release-assets/**/*.apk
+          tag_name: ${{ needs.check.outputs.resolved_tag }}
+          name: Build-${{ needs.check.outputs.resolved_tag }}
+          files: |
+            ./release-assets/**/*.apk
           draft: false
           prerelease: false
         env:
@@ -201,13 +183,8 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add "releases/packages-25.12/luci/"
+          git commit -m "Update $CURRENT_PKG to ${{ needs.check.outputs.resolved_tag }}" || echo "No changes"
           
-          if git diff --staged --quiet; then
-            echo "No changes to commit"
-            exit 0
-          fi
-          
-          git commit -m "Update $CURRENT_PKG to ${{ needs.check.outputs.tag_name }}"
           for i in {1..5}; do
             git pull --rebase origin main && \
             git push origin main && break || \
