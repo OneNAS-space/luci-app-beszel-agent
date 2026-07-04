@@ -123,9 +123,11 @@ jobs:
           if grep -q '^PKG_NAME' "$MF"; then
             echo "Found PKG_NAME, inserting after it"
             sed -i "/^PKG_NAME/a PKG_VERSION:=${V}" "$MF"
+            sed -i "/^PKG_NAME/a PKG_RELEASE:=" "$MF"
           elif grep -q '^LUCI_NAME' "$MF"; then
             echo "Found LUCI_NAME, inserting after it"
             sed -i "/^LUCI_NAME/a PKG_VERSION:=${V}" "$MF"
+            sed -i "/^LUCI_NAME/a PKG_RELEASE:=" "$MF"
           else
             echo "PKG_VERSION:=${V}" > "$MF.tmp"
             cat "$MF" >> "$MF.tmp"
