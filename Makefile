@@ -1,17 +1,28 @@
-# SPDX-License-Identifier: GPL-2.0-only
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright 2026 OneNAS/RouteONE, Jackie264 (jackie@onenas.space).
 
 include $(TOPDIR)/rules.mk
 
-LUCI_NAME:=luci-app-beszel-agent
-LUCI_MAINTAINER:=Jackie264 <OneNAS-space>
+PKG_NAME:=luci-app-beszel-agent
+PKG_LICENSE:=AGPL-3.0-or-later
+PKG_CPE_ID:=cpe:/a:Jackie264:luci-app-beszel-agent
+PKG_MAINTAINER:=Jackie264 <OneNAS-space>
+
 LUCI_TITLE:=LuCI support for Beszel Agent
-LUCI_DEPENDS:=+luci-base beszel-agent
+LUCI_URL:=https://github.com/OneNAS-space/luci-app-beszel-agent/
+LUCI_DESCRIPTION:=Provides Web UI (found under Services/beszel-agent) to config Beszel Agent
+LUCI_DEPENDS:=+luci-base +beszel-agent
 LUCI_PKGARCH:=all
 
-PKG_LICENSE:=GPL-2.0-only
-PKG_CPE_ID:=cpe:/a:Jackie264:luci-app-beszel-agent
-
 PKG_UNPACK:=$(CURDIR)/.prepare.sh $(PKG_NAME) $(CURDIR) $(PKG_BUILD_DIR)
+
+define Package/$(PKG_NAME)/config
+# shown in make menuconfig <Help>
+help
+	$(LUCI_TITLE)
+	.
+	Version: $(PKG_VERSION)-$(PKG_RELEASE)
+endef
 
 define Package/luci-app-beszel-agent/prerm
 #!/bin/sh
