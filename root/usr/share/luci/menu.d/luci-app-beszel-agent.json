@@ -3,7 +3,7 @@
 		"title": "Beszel Agent",
 		"action": {
 			"type": "view",
-			"path": "beszel-agent/config"
+			"path": "beszel-agent"
 		},
 		"depends": {
 			"acl": [ "luci-app-beszel-agent" ],
