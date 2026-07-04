@@ -20,7 +20,7 @@ jobs:
     outputs:
       resolved_tag: ${{ steps.resolve.outputs.version }}
       pkg_version: ${{ steps.resolve.outputs.pkg_version }}
-      should_build: ${{ steps.resolve.outputs.should_build }}
+      should_build: ${{ steps.check_release.outputs.should_build }}
 
     steps:
       - name: 🧾 Checkout repo
