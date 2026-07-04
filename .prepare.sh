@@ -4,8 +4,10 @@ PKG_BUILD_DIR="$3"
 
 if [ -d "$CURDIR/.git" ]; then
 	config="$CURDIR/.git/config"
-else
+elif [ -f "$CURDIR/.git" ]; then
 	config="$(sed "s|^gitdir:\s*|$CURDIR/|;s|$|/config|" "$CURDIR/.git")"
+else
+	exit 0
 fi
 if grep -q -E "url.*gitcode\.(com|net)" "$config"; then
 	for d in htdocs patches po root; do
