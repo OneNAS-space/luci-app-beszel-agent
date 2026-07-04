@@ -73,7 +73,7 @@ return view.extend({
 
 	async render([isRunning, versionText]) {
 		const map = new form.Map('beszel-agent', _('Beszel Agent'),
-			_('Lightweight server monitoring hub with Docker support.'));
+			_('Lightweight telemetry agent for reporting system and Docker metrics to your Beszel Hub.'));
 
 		const statusSect = map.section(form.TypedSection, 'status');
 		statusSect.anonymous = true;
