@@ -1,0 +1,215 @@
+name: Build luci-app-beszel-agent Package
+permissions:
+  contents: write
+
+on:
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - '.github/**'
+      - 'README.md'
+      - 'LICENSE'
+      - 'SECURITY.md'
+  workflow_dispatch:
+
+jobs:
+  check:
+    name: 1. Resolve Version
+    runs-on: ubuntu-latest
+    outputs:
+      should_build: ${{ steps.check_release.outputs.should_build }}
+      tag_name: ${{ steps.version.outputs.tag_name }}
+      main_version: ${{ steps.version.outputs.main_version }}
+      
+    steps:
+      - name: 🧾 Checkout repo
+        uses: actions/checkout@v7
+
+      - name: 🏷️ Extract version info from Git Commit
+        id: version
+        run: |
+          set -euo pipefail
+
+          COMMIT_SHA=$(git rev-parse --short=7 HEAD)
+
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            echo "Manual trigger detected. Using current time to force unique version."
+            BASE_TIMESTAMP=$(date +%s)
+          else
+            BASE_TIMESTAMP=$(git log -1 --format=%ct)
+          fi
+
+          PKG_VERSION_DATE=$(date -u -d "@${BASE_TIMESTAMP}" +'%y.%j')
+          PKG_VERSION_SECS=$(printf "%05d" $(( BASE_TIMESTAMP % 86400 )))
+          OFFICIAL_VERSION="${PKG_VERSION_DATE}.${PKG_VERSION_SECS}~${COMMIT_SHA}"
+          GIT_TAG_VERSION="${PKG_VERSION_DATE}.${PKG_VERSION_SECS}"
+
+          echo "tag_name=v${GIT_TAG_VERSION}" >> "$GITHUB_OUTPUT"
+          echo "main_version=${OFFICIAL_VERSION}" >> "$GITHUB_OUTPUT"
+
+      - name: 🧐 Check if release exists
+        id: check_release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.version.outputs.tag_name }}
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            echo "Manual run detected. Forcing build."
+            echo "should_build=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if gh release view "$TAG" > /dev/null 2>&1; then
+            echo "Release $TAG already exists. Skipping build."
+            echo "should_build=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "Release $TAG does not exist. Proceeding with build."
+            echo "should_build=true" >> "$GITHUB_OUTPUT"
+          fi
+
+  build:
+    name: Build for ${{ matrix.version }} / ${{ matrix.target }}
+    needs: check
+    if: needs.check.outputs.should_build == 'true'
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - version: openwrt-25.12
+            target: x86_64
+            suffix: noarch
+
+    steps:
+      - name: 🧾 Checkout repo
+        uses: actions/checkout@v7
+
+      - name: 📛 Set PKG_NAME from repo
+        run: echo "PKG_NAME=${{ github.event.repository.name }}" >> "$GITHUB_ENV"
+
+      - name: 🧰 Set up Feed structure
+        run: |
+          set -e
+          mkdir -p package
+          printf 'include $(TOPDIR)/feeds/luci/luci.mk\n' > package/luci.mk
+
+          mkdir -p feed/luci/applications/${PKG_NAME}
+          mkdir -p feed/luci
+          printf 'include $(TOPDIR)/feeds/luci/luci.mk\n' > feed/luci/luci.mk
+
+          rsync -av \
+            --exclude='.git' \
+            --exclude='feed' \
+            --exclude='.github' \
+            --exclude='patches' \
+            --exclude='SECURITY.md' \
+            --exclude='README.md' \
+            --exclude='.upstream_meta' \
+            --exclude='.official_json_version' \
+            ./ feed/luci/applications/${PKG_NAME}/
+
+      - name: 🩹 Patch Makefile with dynamic version
+        id: patch_version
+        run: |
+          set -euo pipefail
+          OFFICIAL_VERSION="${{ needs.check.outputs.main_version }}"
+          echo "🚀 Using official standard version: ${OFFICIAL_VERSION}"
+
+          MF="feed/luci/applications/${PKG_NAME}/Makefile"
+          sed -i '/^PKG_VERSION/d' "$MF"
+          sed -i '/^PKG_RELEASE/d' "$MF"
+          sed -i "/^LUCI_NAME/a PKG_RELEASE:=" "$MF"
+          sed -i "/^LUCI_NAME/a PKG_VERSION:=${OFFICIAL_VERSION}" "$MF"
+
+          echo "✅ Patched Makefile metadata:"
+          grep -E 'PKG_VERSION|PKG_RELEASE' "$MF"
+          
+      - name: 🧮 Compute ARCH
+        run: echo "ARCH=${{ matrix.target }}-${{ matrix.version }}" >> "$GITHUB_ENV"
+
+      - name: 🏗️ Build with OpenWrt SDK
+        uses: openwrt/gh-action-sdk@v11
+        env:
+          ARCH: ${{ env.ARCH }}
+          FEEDNAME: jackie264
+          PACKAGES: ${{ env.PKG_NAME }}
+          INDEX: 0
+          FEED_DIR: ${{ github.workspace }}/feed
+          NO_SHFMT_CHECK: 1
+          NO_REFRESH_CHECK: 1
+
+      - name: 📦 Upload artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ env.PKG_NAME }}-${{ matrix.target }}-${{ matrix.version }}
+          path: bin/packages/*/jackie264/${{ env.PKG_NAME }}*.apk
+          if-no-files-found: ignore
+
+  release:
+    name: 3. Release & Deploy ${{ github.repository }}
+    needs: [check, build]
+    if: needs.check.outputs.should_build == 'true'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 🧾 Checkout repo
+        uses: actions/checkout@v7
+
+      - name: ⬇️ Download all build artifacts
+        uses: actions/download-artifact@v8
+        with:
+          path: ./release-assets
+
+      - name: 🗃️ Create GitHub Release
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ needs.check.outputs.tag_name }}
+          name: Build-${{ needs.check.outputs.tag_name }}
+          files: ./release-assets/**/*.apk
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 🔑 Checkout custom-packages repo
+        uses: actions/checkout@v7
+        with:
+          repository: OneNAS-space/custom-packages
+          token: ${{ secrets.CUSTOM_PACKAGES_TOKEN }}
+          path: custom-packages
+
+      - name: 🚚 Update luci artifacts
+        run: |
+          set -e
+          CURRENT_PKG="${{ github.event.repository.name }}"
+          TARGET_DIR="custom-packages/releases/packages-25.12/luci"
+          mkdir -p "$TARGET_DIR"
+          
+          echo "Cleaning all old versions for $CURRENT_PKG in $TARGET_DIR..."
+          rm -f "$TARGET_DIR/${CURRENT_PKG}"-*.apk
+          
+          find ./release-assets -type f -name "*.apk" | while read -r f; do
+            echo "Deploying $(basename "$f") to $TARGET_DIR/"
+            cp "$f" "$TARGET_DIR/"
+          done
+          
+          echo "=== 25.12 Content ==="
+          ls -la "$TARGET_DIR/${CURRENT_PKG}"* || echo "No APKs found"
+
+          cd custom-packages
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add "releases/packages-25.12/luci/"
+          
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+            exit 0
+          fi
+          
+          git commit -m "Update $CURRENT_PKG to ${{ needs.check.outputs.tag_name }}"
+          for i in {1..5}; do
+            git pull --rebase origin main && \
+            git push origin main && break || \
+            (echo "Conflict detected, retrying in 5s..." && sleep 5)
+          done
