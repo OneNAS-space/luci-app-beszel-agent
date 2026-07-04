@@ -13,4 +13,5 @@
 
 ## Dependent package
 The lightweight telemetry agent adapted to OpenWrt is used to report system and Docker indicators to your Beszel Hub.
+
 [Beszel-Agent](https://github.com/OneNAS-space/beszel-agent)
