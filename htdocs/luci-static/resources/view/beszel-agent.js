@@ -104,12 +104,23 @@ return view.extend({
 
 		const hubOpt = mainSect.taboption('general', form.Value, 'hub_url', _('Hub URL'), _('The URL of your Beszel Hub.'));
 		hubOpt.placeholder = 'http://hub.example.com:8090';
+		hubOpt.attrs = { autocomplete: 'off' };
 
 		const tokenOpt = mainSect.taboption('general', form.Value, 'token', _('Token'), _('Authentication token (if using token-based auth).'));
 		tokenOpt.password = true;
+		tokenOpt.rmempty = false;
+		tokenOpt.validate = function(section_id, value) {
+			if (!value) return _('This field is required.');
+			return true;
+		};
 
-		const keyOpt = mainSect.taboption('general', form.Value, 'key', _('SSH Key'), _('Public SSH key (if using SSH-based auth).'));
+		const keyOpt = mainSect.taboption('general', form.Value, 'key', _('Public Key'), _('Public SSH key (if using SSH-based auth).'));
 		keyOpt.placeholder = 'ssh-ed25519 ...';
+		keyOpt.rmempty = false;
+		keyOpt.validate = function(section_id, value) {
+			if (!value) return _('This field is required.');
+			return true;
+		};
 
 		const extraFsOpt = mainSect.taboption('mounts', form.DynamicList, 'extra_filesystems', _('Extra Filesystems'),
 			_('Specify additional mount points to monitor (e.g., /mnt/sda1).'));
