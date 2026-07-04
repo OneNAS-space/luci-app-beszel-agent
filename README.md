@@ -11,6 +11,6 @@
 <img width="1450" height="390" alt="Screenshot 2026-07-04 at 16 25 32" src="https://github.com/user-attachments/assets/44ab98a5-1e5b-494c-878e-7914474907c4" />
 <img width="1413" height="724" alt="Screenshot 2026-07-04 at 16 26 17" src="https://github.com/user-attachments/assets/8302176d-98d4-4f4c-a6d7-9294db2745d6" />
 
-# beszel-agent
+## Dependent package
 The lightweight telemetry agent adapted to OpenWrt is used to report system and Docker indicators to your Beszel Hub.
-https://github.com/OneNAS-space/beszel-agent
+[Beszel-Agent](https://github.com/OneNAS-space/beszel-agent)
