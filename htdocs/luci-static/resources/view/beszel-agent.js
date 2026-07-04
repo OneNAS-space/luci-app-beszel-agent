@@ -1,6 +1,7 @@
 'use strict';
 
 'require dom';
+'require fs';
 'require form';
 'require poll';
 'require rpc';
@@ -34,6 +35,20 @@ async function getStatus() {
 	}
 }
 
+async function getVersion() {
+	try {
+		const res = await fs.exec('/usr/bin/beszel-agent', ['-v']);
+		if (res && res.code === 0 && res.stdout) {
+			const match = res.stdout.match(/v\d+(\.\d+){1,2}(-[a-zA-Z0-9.]+)?/);
+			return match ? match[0] : res.stdout.trim();
+		}
+		return _('Unknown');
+	} catch (e) {
+		console.error(e);
+		return _('Unknown');
+	}
+}
+
 function getStatusValue(isRunning) {
 	return isRunning ? RUNNING_SPAN : NOT_RUNNING_SPAN;
 }
@@ -52,6 +67,7 @@ return view.extend({
 	load() {
 		return Promise.all([
 			getStatus(),
+			getVersion(),
 		]);
 	},
 
@@ -62,6 +78,9 @@ return view.extend({
 		const statusSect = map.section(form.TypedSection, 'status');
 		statusSect.anonymous = true;
 		statusSect.cfgsections = () => ['status_section'];
+
+		const versionOpt = statusSect.option(form.DummyValue, '_version', _('Version'));
+		versionOpt.cfgvalue = () => versionText;
 
 		const statusOpt = statusSect.option(form.DummyValue, '_status', _('Service Status'));
 		statusOpt.rawhtml = true;
