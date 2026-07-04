@@ -109,31 +109,67 @@ return view.extend({
 		const tokenOpt = mainSect.taboption('general', form.Value, 'token', _('Token'), _('Authentication token (if using token-based auth).'));
 		tokenOpt.password = true;
 		tokenOpt.rmempty = false;
-		tokenOpt.validate = function(section_id, value) {
-			if (!value) return _('This field is required.');
-			return true;
-		};
+		tokenOpt.validate = (section_id, value) => value ? true : _('This field is required.');
 
 		const keyOpt = mainSect.taboption('general', form.Value, 'key', _('Public Key'), _('Public SSH key (if using SSH-based auth).'));
 		keyOpt.placeholder = 'ssh-ed25519 ...';
 		keyOpt.rmempty = false;
-		keyOpt.validate = function(section_id, value) {
-			if (!value) return _('This field is required.');
-			return true;
-		};
+		keyOpt.validate = (section_id, value) => value ? true : _('This field is required.');
 
 		const extraFsOpt = mainSect.taboption('mounts', form.DynamicList, 'extra_filesystems', _('Extra Filesystems'),
 			_('Specify additional mount points to monitor (e.g., /mnt/sda1).'));
 		extraFsOpt.placeholder = '/mnt/sda1';
-		extraFsOpt.validate = function(section_id, value) {
-			if (!value) return true;
-			if (!value.startsWith('/')) {
-				return _('Path must be absolute (must start with /).');
+		extraFsOpt.validate = (section_id, value) => (!value || value.startsWith('/')) ? true : _('Path must be absolute (must start with /).');
+
+		const rendered = await map.render();
+
+		const tokenInput = map.findElement('input', tokenOpt.cbid('beszel-agent'));
+		const keyInput = map.findElement('input', keyOpt.cbid('beszel-agent'));
+		const enableInput = map.findElement('input', enableOpt.cbid('beszel-agent'));
+
+		function updateVisualState() {
+			if (!tokenInput || !keyInput || !enableInput) return;
+			const hasToken = tokenInput.value.trim().length > 0;
+			const hasKey = keyInput.value.trim().length > 0;
+			
+			enableInput.style.opacity = (hasToken && hasKey) ? '1' : '0.5';
+		}
+
+		function interceptEnable(ev) {
+			if (!tokenInput || !keyInput || !enableInput) return;
+			const hasToken = tokenInput.value.trim().length > 0;
+			const hasKey = keyInput.value.trim().length > 0;
+
+			if (!hasToken || !hasKey) {
+				enableInput.checked = false;
+				
+				ev.preventDefault();
+				ev.stopPropagation();
+				
+				alert(_('Please enter both Token and Public Key before enabling the agent.'));
+			}
+		}
+
+		if (enableInput) {
+			enableInput.addEventListener('change', interceptEnable);
+			enableInput.addEventListener('click', interceptEnable);
+		}
+		
+		if (tokenInput) tokenInput.addEventListener('input', updateVisualState);
+		if (keyInput) keyInput.addEventListener('input', updateVisualState);
+
+		updateVisualState();
+
+		enableOpt.validate = (section_id, value) => {
+			if (value === '1') {
+				const hasToken = tokenInput?.value?.trim().length > 0;
+				const hasKey = keyInput?.value?.trim().length > 0;
+				if (!hasToken || !hasKey) {
+					return _('You must provide both a Token and a Public Key to enable the agent.');
+				}
 			}
 			return true;
 		};
-
-		const rendered = await map.render();
 
 		const statusNode = map.findElement('data-field', statusOpt.cbid('status_section'));
 		poll.add(updateStatus(statusNode), POLL_INTERVAL);
