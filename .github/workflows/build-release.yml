@@ -18,7 +18,6 @@ jobs:
     outputs:
       resolved_tag: ${{ steps.resolve.outputs.version }}
       pkg_version: ${{ steps.resolve.outputs.pkg_version }}
-      pkg_release: ${{ steps.resolve.outputs.pkg_release }}
       should_build: "true"
     steps:
       - name: 🧾 Generate Dynamic Version
