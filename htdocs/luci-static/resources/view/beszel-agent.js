@@ -91,7 +91,7 @@ return view.extend({
 		mainSect.addremove = false;
 
 		mainSect.tab('general', _('General Settings'));
-		mainSect.tab('mounts', _('File System Access'), _('Configure additional file systems for Beszel Agent to monitor.'));
+		mainSect.tab('mounts', _('Extra Disks'), _('Configure extra disks for Beszel Agent to monitor.'));
 
 		const enableOpt = mainSect.taboption('general', form.Flag, 'enable', _('Enable'));
 		enableOpt.default = '0';
@@ -104,7 +104,6 @@ return view.extend({
 
 		const hubOpt = mainSect.taboption('general', form.Value, 'hub_url', _('Hub URL'), _('The URL of your Beszel Hub.'));
 		hubOpt.placeholder = 'http://hub.example.com:8090';
-		hubOpt.attrs = { autocomplete: 'off' };
 
 		const tokenOpt = mainSect.taboption('general', form.Value, 'token', _('Token'), _('Authentication token (if using token-based auth).'));
 		tokenOpt.password = true;
@@ -123,47 +122,73 @@ return view.extend({
 
 		const rendered = await map.render();
 
-		const tokenInput = map.findElement('input', tokenOpt.cbid('beszel-agent'));
-		const keyInput = map.findElement('input', keyOpt.cbid('beszel-agent'));
-		const enableInput = map.findElement('input', enableOpt.cbid('beszel-agent'));
+		const style = document.createElement('style');
+		style.innerHTML = '.hide-agent-ui { display: none !important; }';
+		rendered.appendChild(style);
 
-		function updateVisualState() {
-			if (!tokenInput || !keyInput || !enableInput) return;
-			const hasToken = tokenInput.value.trim().length > 0;
-			const hasKey = keyInput.value.trim().length > 0;
-			
-			enableInput.style.opacity = (hasToken && hasKey) ? '1' : '0.5';
-		}
+		const enableRow = rendered.querySelector('.cbi-value[id$="-enable"]');
+		const tokenRow = rendered.querySelector('.cbi-value[id$="-token"]');
+		const keyRow = rendered.querySelector('.cbi-value[id$="-key"]');
 
-		function interceptEnable(ev) {
-			if (!tokenInput || !keyInput || !enableInput) return;
-			const hasToken = tokenInput.value.trim().length > 0;
-			const hasKey = keyInput.value.trim().length > 0;
+		if (enableRow && tokenRow && keyRow) {
+			const fieldContainer = enableRow.querySelector('.cbi-value-field');
+			const tokenInput = tokenRow.querySelector('input[type="password"], input[type="text"]');
+			const keyInput = keyRow.querySelector('input[type="text"]');
 
-			if (!hasToken || !hasKey) {
-				enableInput.checked = false;
+			if (fieldContainer && tokenInput && keyInput) {
+				const warningNode = document.createElement('div');
+				warningNode.style.color = '#ff9800';
+				warningNode.style.fontWeight = 'bold';
+				warningNode.style.paddingTop = '6px';
+				warningNode.innerHTML = '💡 ' + _('Please configure both Token and Public Key to enable.');
 				
-				ev.preventDefault();
-				ev.stopPropagation();
+				fieldContainer.prepend(warningNode);
+
+				function updateEnableUI() {
+					const hasToken = tokenInput.value.trim().length > 0;
+					const hasKey = keyInput.value.trim().length > 0;
+					const isValid = hasToken && hasKey;
+
+					if (!isValid) {
+						const cb = fieldContainer.querySelector('input[type="checkbox"]');
+						if (cb && cb.checked) {
+							cb.checked = false;
+							cb.dispatchEvent(new Event('change', { bubbles: true }));
+						}
+					}
+
+					Array.from(fieldContainer.children).forEach(child => {
+						if (child === warningNode) {
+							child.style.display = isValid ? 'none' : 'block';
+						} else {
+							if (isValid) {
+								child.classList.remove('hide-agent-ui');
+							} else {
+								child.classList.add('hide-agent-ui');
+							}
+						}
+					});
+				}
+
+				tokenInput.addEventListener('input', updateEnableUI);
+				tokenInput.addEventListener('change', updateEnableUI);
+				keyInput.addEventListener('input', updateEnableUI);
+				keyInput.addEventListener('change', updateEnableUI);
+
+				updateEnableUI();
 				
-				alert(_('Please enter both Token and Public Key before enabling the agent.'));
+				setTimeout(updateEnableUI, 100);
 			}
 		}
 
-		if (enableInput) {
-			enableInput.addEventListener('change', interceptEnable);
-			enableInput.addEventListener('click', interceptEnable);
-		}
-		
-		if (tokenInput) tokenInput.addEventListener('input', updateVisualState);
-		if (keyInput) keyInput.addEventListener('input', updateVisualState);
-
-		updateVisualState();
-
-		enableOpt.validate = (section_id, value) => {
+		enableOpt.validate = function(section_id, value) {
 			if (value === '1') {
-				const hasToken = tokenInput?.value?.trim().length > 0;
-				const hasKey = keyInput?.value?.trim().length > 0;
+				const tInput = document.querySelector('.cbi-value[id$="-token"] input');
+				const kInput = document.querySelector('.cbi-value[id$="-key"] input');
+				
+				const hasToken = tInput && tInput.value.trim().length > 0;
+				const hasKey = kInput && kInput.value.trim().length > 0;
+				
 				if (!hasToken || !hasKey) {
 					return _('You must provide both a Token and a Public Key to enable the agent.');
 				}
@@ -172,7 +197,9 @@ return view.extend({
 		};
 
 		const statusNode = map.findElement('data-field', statusOpt.cbid('status_section'));
-		poll.add(updateStatus(statusNode), POLL_INTERVAL);
+		if (statusNode) {
+			poll.add(updateStatus(statusNode), POLL_INTERVAL);
+		}
 
 		return rendered;
 	},
