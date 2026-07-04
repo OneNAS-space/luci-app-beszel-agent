@@ -39,7 +39,7 @@ async function getVersion() {
 	try {
 		const res = await fs.exec('/usr/bin/beszel-agent', ['-v']);
 		if (res && res.code === 0 && res.stdout) {
-			const match = res.stdout.match(/v\d+(\.\d+){1,2}(-[a-zA-Z0-9.]+)?/);
+			const match = res.stdout.match(/(\d+\.\d+\.\d+)/);
 			return match ? match[0] : res.stdout.trim();
 		}
 		return _('Unknown');
