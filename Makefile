@@ -10,7 +10,7 @@ PKG_MAINTAINER:=Jackie264 <OneNAS-space>
 
 LUCI_TITLE:=LuCI support for Beszel Agent
 LUCI_URL:=https://github.com/OneNAS-space/luci-app-beszel-agent/
-LUCI_DESCRIPTION:=Provides Web UI (found under Services/beszel-agent) to config Beszel Agent
+LUCI_DESCRIPTION:=Provides Web UI (found under Services/Beszel Agent) to config Beszel Agent
 LUCI_DEPENDS:=+luci-base +beszel-agent
 LUCI_PKGARCH:=all
 
