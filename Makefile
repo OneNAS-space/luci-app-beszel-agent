@@ -15,6 +15,7 @@ LUCI_DEPENDS:=+beszel-agent
 LUCI_PKGARCH:=all
 
 # PKG_UNPACK:=$(CURDIR)/.prepare.sh $(PKG_NAME) $(CURDIR) $(PKG_BUILD_DIR)
+PKG_UNPACK:=/bin/sh $(CURDIR)/.prepare.sh $(PKG_NAME) $(CURDIR) $(PKG_BUILD_DIR)
 
 define Package/$(PKG_NAME)/config
 # shown in make menuconfig <Help>
