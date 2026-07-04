@@ -119,8 +119,8 @@ jobs:
           MF="feed/luci/applications/${PKG_NAME}/Makefile"
           sed -i '/^PKG_VERSION/d' "$MF"
           sed -i '/^PKG_RELEASE/d' "$MF"
-          sed -i "/^LUCI_NAME/a PKG_RELEASE:=" "$MF"
-          sed -i "/^LUCI_NAME/a PKG_VERSION:=${OFFICIAL_VERSION}" "$MF"
+          sed -i "/^PKG_NAME/a PKG_RELEASE:=1" "$MF"
+          sed -i "/^PKG_NAME/a PKG_VERSION:=${OFFICIAL_VERSION}" "$MF"
 
           echo "✅ Patched Makefile metadata:"
           grep -E 'PKG_VERSION|PKG_RELEASE' "$MF"
