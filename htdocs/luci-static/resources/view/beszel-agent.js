@@ -101,19 +101,20 @@ return view.extend({
 		portOpt.datatype = 'port';
 		portOpt.default = '45876';
 		portOpt.placeholder = '45876';
+		portOpt.rmempty = false;
 
 		const hubOpt = mainSect.taboption('general', form.Value, 'hub_url', _('Hub URL'), _('The URL of your Beszel Hub.'));
 		hubOpt.placeholder = 'http://hub.example.com:8090';
-
-		const tokenOpt = mainSect.taboption('general', form.Value, 'token', _('Token'), _('Authentication token (if using token-based auth).'));
-		tokenOpt.password = true;
-		tokenOpt.rmempty = false;
-		tokenOpt.validate = (section_id, value) => value ? true : _('This field is required.');
+		hubOpt.attrs = { autocomplete: 'off' };
+		hubOpt.rmempty = false;
 
 		const keyOpt = mainSect.taboption('general', form.Value, 'key', _('Public Key'), _('Public SSH key (if using SSH-based auth).'));
 		keyOpt.placeholder = 'ssh-ed25519 ...';
 		keyOpt.rmempty = false;
-		keyOpt.validate = (section_id, value) => value ? true : _('This field is required.');
+
+		const tokenOpt = mainSect.taboption('general', form.Value, 'token', _('Token'), _('Authentication token (if using token-based auth).'));
+		tokenOpt.password = true;
+		tokenOpt.rmempty = false;
 
 		const extraFsOpt = mainSect.taboption('mounts', form.DynamicList, 'extra_filesystems', _('Extra Filesystems'),
 			_('Specify additional mount points to monitor (e.g., /mnt/sda1).'));
@@ -127,27 +128,50 @@ return view.extend({
 		rendered.appendChild(style);
 
 		const enableRow = rendered.querySelector('.cbi-value[id$="-enable"]');
+		const portRow = rendered.querySelector('.cbi-value[id$="-port"]');
+		const hubRow = rendered.querySelector('.cbi-value[id$="-hub_url"]');
 		const tokenRow = rendered.querySelector('.cbi-value[id$="-token"]');
 		const keyRow = rendered.querySelector('.cbi-value[id$="-key"]');
 
-		if (enableRow && tokenRow && keyRow) {
+		if (enableRow && portRow && hubRow && tokenRow && keyRow) {
 			const fieldContainer = enableRow.querySelector('.cbi-value-field');
-			const tokenInput = tokenRow.querySelector('input[type="password"], input[type="text"]');
-			const keyInput = keyRow.querySelector('input[type="text"]');
+			const portInput = portRow.querySelector('input');
+			const hubInput = hubRow.querySelector('input');
+			const tokenInput = tokenRow.querySelector('input');
+			const keyInput = keyRow.querySelector('input');
 
-			if (fieldContainer && tokenInput && keyInput) {
+			if (fieldContainer && portInput && hubInput && tokenInput && keyInput) {
 				const warningNode = document.createElement('div');
 				warningNode.style.color = '#ff9800';
 				warningNode.style.fontWeight = 'bold';
 				warningNode.style.paddingTop = '6px';
-				warningNode.innerHTML = '💡 ' + _('Please configure both Token and Public Key to enable.');
-				
+				warningNode.innerHTML = '💡 ' + _('Please configure Port, Hub URL, Token, and Public Key to enable.');
 				fieldContainer.prepend(warningNode);
 
 				function updateEnableUI() {
+					const hasPort = portInput.value.trim().length > 0;
+					const hasHub = hubInput.value.trim().length > 0;
 					const hasToken = tokenInput.value.trim().length > 0;
 					const hasKey = keyInput.value.trim().length > 0;
-					const isValid = hasToken && hasKey;
+					
+					const missing = [];
+					if (!hasPort) missing.push(_('Port'));
+					if (!hasHub) missing.push(_('Hub URL'));
+					if (!hasToken) missing.push(_('Token'));
+					if (!hasKey) missing.push(_('Public Key'));
+
+					const isValid = missing.length === 0;
+
+					if (!isValid) {
+						let missingText = '';
+						if (missing.length === 1) {
+							missingText = missing[0];
+						} else {
+							const last = missing.pop();
+							missingText = missing.join(', ') + ' ' + _('and') + ' ' + last;
+						}
+						warningNode.innerHTML = '💡 ' + _('Please configure %s to enable.').replace('%s', missingText);
+					}
 
 					if (!isValid) {
 						const cb = fieldContainer.querySelector('input[type="checkbox"]');
@@ -161,45 +185,22 @@ return view.extend({
 						if (child === warningNode) {
 							child.style.display = isValid ? 'none' : 'block';
 						} else {
-							if (isValid) {
-								child.classList.remove('hide-agent-ui');
-							} else {
-								child.classList.add('hide-agent-ui');
-							}
+							if (isValid) child.classList.remove('hide-agent-ui');
+							else child.classList.add('hide-agent-ui');
 						}
 					});
 				}
-
-				tokenInput.addEventListener('input', updateEnableUI);
-				tokenInput.addEventListener('change', updateEnableUI);
-				keyInput.addEventListener('input', updateEnableUI);
-				keyInput.addEventListener('change', updateEnableUI);
-
+				[portInput, hubInput, tokenInput, keyInput].forEach(inp => {
+					inp.addEventListener('input', updateEnableUI);
+					inp.addEventListener('change', updateEnableUI);
+				});
 				updateEnableUI();
-				
 				setTimeout(updateEnableUI, 100);
 			}
 		}
 
-		enableOpt.validate = function(section_id, value) {
-			if (value === '1') {
-				const tInput = document.querySelector('.cbi-value[id$="-token"] input');
-				const kInput = document.querySelector('.cbi-value[id$="-key"] input');
-				
-				const hasToken = tInput && tInput.value.trim().length > 0;
-				const hasKey = kInput && kInput.value.trim().length > 0;
-				
-				if (!hasToken || !hasKey) {
-					return _('You must provide both a Token and a Public Key to enable the agent.');
-				}
-			}
-			return true;
-		};
-
 		const statusNode = map.findElement('data-field', statusOpt.cbid('status_section'));
-		if (statusNode) {
-			poll.add(updateStatus(statusNode), POLL_INTERVAL);
-		}
+		if (statusNode) poll.add(updateStatus(statusNode), POLL_INTERVAL);
 
 		return rendered;
 	},
