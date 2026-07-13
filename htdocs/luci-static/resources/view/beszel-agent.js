@@ -91,6 +91,7 @@ return view.extend({
 		mainSect.addremove = false;
 
 		mainSect.tab('general', _('General Settings'));
+		mainSect.tab('network', _('Network Settings'), _('Configure network interface monitoring rules.'));
 		mainSect.tab('mounts', _('Extra Disks'), _('Configure extra disks for Beszel Agent to monitor.'));
 
 		const enableOpt = mainSect.taboption('general', form.Flag, 'enable', _('Enable'));
@@ -115,6 +116,10 @@ return view.extend({
 		const tokenOpt = mainSect.taboption('general', form.Value, 'token', _('Token'), _('Authentication token (if using token-based auth).'));
 		tokenOpt.password = true;
 		tokenOpt.rmempty = false;
+
+		const nicsOpt = mainSect.taboption('network', form.DynamicList, 'nics', _('Interface Filters (NICS)'),
+			_('Specify network interfaces to monitor or exclude. Prefix with "-" to blacklist (e.g., "-phy*", "-*ap*"). Leave empty to use default filtering.'));
+		nicsOpt.placeholder = '-phy*';
 
 		const extraFsOpt = mainSect.taboption('mounts', form.DynamicList, 'extra_filesystems', _('Extra Filesystems'),
 			_('Specify additional mount points to monitor (e.g., /mnt/sda1).'));
