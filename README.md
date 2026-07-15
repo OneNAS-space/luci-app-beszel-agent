@@ -1,8 +1,9 @@
 # luci-app-beszel-agent
 - Provides Web UI (found under Services/Beszel Agent) to config Beszel Agent
 
-<img width="1442" height="744" alt="Screenshot 2026-07-04 at 16 22 16" src="https://github.com/user-attachments/assets/2532622f-3474-48f9-85ab-d1e0184dbc12" />
-<img width="1233" height="186" alt="Screenshot 2026-07-04 at 16 22 43" src="https://github.com/user-attachments/assets/c5ea7e13-b372-4713-9f58-e261c39df7f6" />
+<img width="837" height="679" alt="Screenshot 2026-07-15 at 18 27 56" src="https://github.com/user-attachments/assets/688d43d7-92a3-4701-89f2-648333f2f547" />
+<img width="583" height="214" alt="Screenshot 2026-07-15 at 18 28 37" src="https://github.com/user-attachments/assets/54c57280-908e-4853-85d1-d9f1bd87206d" />
+<img width="603" height="187" alt="Screenshot 2026-07-15 at 18 28 58" src="https://github.com/user-attachments/assets/5d948ee6-8946-47a1-a808-22d8659dcf28" />
 
 
 - You can see almost all the system information of OpenWRT in your Beszel Hub.
