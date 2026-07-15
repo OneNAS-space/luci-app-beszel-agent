@@ -165,17 +165,26 @@ return view.extend({
 			const tokenInput = tokenRow.querySelector('input');
 			const keyInput = keyRow.querySelector('input');
 
-			if (listenInput && portInput) {
-				listenInput.addEventListener('input', () => {
-					if (listenInput.value.trim() !== '' && portInput.value !== '') {
-						portInput.value = '';
-						portInput.dispatchEvent(new Event('input', { bubbles: true }));
+			if (listenInput && portInput && portRow) {
+				function handleListenVisibility() {
+					const hasListen = listenInput.value.trim() !== '';
+					if (hasListen) {
+						if (portInput.value !== '') {
+							portInput.value = '';
+							portInput.dispatchEvent(new Event('input', { bubbles: true }));
+						}
+						portRow.style.display = 'none';
+					} else {
+						portRow.style.display = '';
 					}
-				});
+				}
+				listenInput.addEventListener('input', handleListenVisibility);
+				handleListenVisibility();
 				portInput.addEventListener('input', () => {
 					if (portInput.value.trim() !== '' && listenInput.value !== '') {
 						listenInput.value = '';
 						listenInput.dispatchEvent(new Event('input', { bubbles: true }));
+						handleListenVisibility(); 
 					}
 				});
 			}
