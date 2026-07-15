@@ -98,6 +98,11 @@ return view.extend({
 		enableOpt.default = '0';
 		enableOpt.rmempty = false;
 
+		const sysNameOpt = mainSect.taboption('general', form.Value, 'system_name', _('System Name'), 
+			_('Override system name on universal token registration.<br>Defaults to hostname if unset.'));
+		sysNameOpt.placeholder = 'OpenWrt';
+		sysNameOpt.rmempty = true;
+
 		const portOpt = mainSect.taboption('general', form.Value, 'port', _('Port'), _('Listening port for the agent.'));
 		portOpt.datatype = 'port';
 		portOpt.default = '45876';
@@ -118,7 +123,7 @@ return view.extend({
 		tokenOpt.rmempty = false;
 
 		const nicsOpt = mainSect.taboption('network', form.DynamicList, 'nics', _('Interface Filters (NICS)'),
-			_('Specify network interfaces to monitor or exclude. Prefix with "-" to blacklist (e.g., "-phy*", "-*ap*"). Leave empty to use default filtering.'));
+			_('Specify network interfaces to monitor or exclude.<br>Prefix with "-" to blacklist (e.g., "-phy*", "-*ap*").<br>Leave empty to use default filtering.'));
 		nicsOpt.placeholder = '-phy*';
 
 		const extraFsOpt = mainSect.taboption('mounts', form.DynamicList, 'extra_filesystems', _('Extra Filesystems'),
