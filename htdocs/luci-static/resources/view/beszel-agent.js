@@ -103,11 +103,24 @@ return view.extend({
 		sysNameOpt.placeholder = 'OpenWrt';
 		sysNameOpt.rmempty = true;
 
-		const portOpt = mainSect.taboption('general', form.Value, 'port', _('Port'), _('Listening port for the agent.'));
+		const listenOpt = mainSect.taboption('general', form.Value, 'listen', _('Listen'), 
+			_('IP address, port, or unix socket<br>(e.g., 0.0.0.0:45876 or [::]:45876). Replaces Port.'));
+		listenOpt.placeholder = '0.0.0.0:45876';
+		listenOpt.rmempty = true;
+
+		const portOpt = mainSect.taboption('general', form.Value, 'port', _('Port (Deprecated)'), 
+			_('Maintained for backward compatibility.<br>Will be cleared if Listen is configured.'));
 		portOpt.datatype = 'port';
 		portOpt.default = '45876';
 		portOpt.placeholder = '45876';
-		portOpt.rmempty = false;
+		portOpt.rmempty = true;
+		portOpt.write = function(section_id, formvalue) {
+			const listenVal = this.section.formvalue(section_id, 'listen');
+			if (listenVal && listenVal.trim() !== '') {
+				return this.super('remove', [section_id]);
+			}
+			return this.super('write', [section_id, formvalue]);
+		};
 
 		const hubOpt = mainSect.taboption('general', form.Value, 'hub_url', _('Hub URL'), _('The URL of your Beszel Hub.'));
 		hubOpt.placeholder = 'http://hub.example.com:8090';
@@ -138,17 +151,34 @@ return view.extend({
 		rendered.appendChild(style);
 
 		const enableRow = rendered.querySelector('.cbi-value[id$="-enable"]');
+		const listenRow = rendered.querySelector('.cbi-value[id$="-listen"]');
 		const portRow = rendered.querySelector('.cbi-value[id$="-port"]');
 		const hubRow = rendered.querySelector('.cbi-value[id$="-hub_url"]');
 		const tokenRow = rendered.querySelector('.cbi-value[id$="-token"]');
 		const keyRow = rendered.querySelector('.cbi-value[id$="-key"]');
 
-		if (enableRow && portRow && hubRow && tokenRow && keyRow) {
+		if (enableRow && hubRow && tokenRow && keyRow && (listenRow || portRow)) {
 			const fieldContainer = enableRow.querySelector('.cbi-value-field');
-			const portInput = portRow.querySelector('input');
+			const listenInput = listenRow ? listenRow.querySelector('input') : null;
+			const portInput = portRow ? portRow.querySelector('input') : null;
 			const hubInput = hubRow.querySelector('input');
 			const tokenInput = tokenRow.querySelector('input');
 			const keyInput = keyRow.querySelector('input');
+
+			if (listenInput && portInput) {
+				listenInput.addEventListener('input', () => {
+					if (listenInput.value.trim() !== '' && portInput.value !== '') {
+						portInput.value = '';
+						portInput.dispatchEvent(new Event('input', { bubbles: true }));
+					}
+				});
+				portInput.addEventListener('input', () => {
+					if (portInput.value.trim() !== '' && listenInput.value !== '') {
+						listenInput.value = '';
+						listenInput.dispatchEvent(new Event('input', { bubbles: true }));
+					}
+				});
+			}
 
 			if (fieldContainer && portInput && hubInput && tokenInput && keyInput) {
 				const warningNode = document.createElement('div');
@@ -159,13 +189,14 @@ return view.extend({
 				fieldContainer.prepend(warningNode);
 
 				function updateEnableUI() {
-					const hasPort = portInput.value.trim().length > 0;
+					const hasListen = listenInput && listenInput.value.trim().length > 0;
+					const hasPort = portInput && portInput.value.trim().length > 0;
 					const hasHub = hubInput.value.trim().length > 0;
 					const hasToken = tokenInput.value.trim().length > 0;
 					const hasKey = keyInput.value.trim().length > 0;
 					
 					const missing = [];
-					if (!hasPort) missing.push(_('Port'));
+					if (!hasListen && !hasPort) missing.push(_('Listen (or Port)'));
 					if (!hasHub) missing.push(_('Hub URL'));
 					if (!hasToken) missing.push(_('Token'));
 					if (!hasKey) missing.push(_('Public Key'));
@@ -200,7 +231,8 @@ return view.extend({
 						}
 					});
 				}
-				[portInput, hubInput, tokenInput, keyInput].forEach(inp => {
+				const inputs = [listenInput, portInput, hubInput, tokenInput, keyInput].filter(Boolean);
+				inputs.forEach(inp => {
 					inp.addEventListener('input', updateEnableUI);
 					inp.addEventListener('change', updateEnableUI);
 				});
