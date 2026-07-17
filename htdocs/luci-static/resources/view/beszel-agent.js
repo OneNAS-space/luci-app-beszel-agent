@@ -93,6 +93,7 @@ return view.extend({
 		mainSect.tab('general', _('General Settings'));
 		mainSect.tab('network', _('Network Settings'), _('Configure network interface monitoring rules.'));
 		mainSect.tab('mounts', _('Extra Disks'), _('Configure extra disks for Beszel Agent to monitor.'));
+		mainSect.tab('other', _('Other Settings'), _('Advanced and others configurations.'));
 
 		const enableOpt = mainSect.taboption('general', form.Flag, 'enable', _('Enable'));
 		enableOpt.default = '0';
@@ -135,14 +136,40 @@ return view.extend({
 		tokenOpt.password = true;
 		tokenOpt.rmempty = false;
 
+		// --- Network Settings  ---
 		const nicsOpt = mainSect.taboption('network', form.DynamicList, 'nics', _('Interface Filters (NICS)'),
 			_('Specify network interfaces to monitor or exclude.<br>Prefix with "-" to blacklist (e.g., "-phy*", "-*ap*").<br>Leave empty to use default filtering.'));
 		nicsOpt.placeholder = '-phy*';
 
+		// --- Extra Disks  ---
 		const extraFsOpt = mainSect.taboption('mounts', form.DynamicList, 'extra_filesystems', _('Extra Filesystems'),
 			_('Specify additional mount points to monitor (e.g., /mnt/sda1).'));
 		extraFsOpt.placeholder = '/mnt/sda1';
 		extraFsOpt.validate = (section_id, value) => (!value || value.startsWith('/')) ? true : _('Path must be absolute (must start with /).');
+
+		// --- Other Settings  ---
+		const logLevelOpt = mainSect.taboption('other', form.ListValue, 'log_level', _('Log Level'));
+		logLevelOpt.default = 'info';
+		logLevelOpt.value('debug', _('Debug'));
+		logLevelOpt.value('info', _('Info'));
+		logLevelOpt.value('warn', _('Warn'));
+		logLevelOpt.value('error', _('Error'));
+
+		const skipGpuOpt = mainSect.taboption('other', form.ListValue, 'skip_gpu', _('Disable GPU Monitoring'));
+		skipGpuOpt.default = 'false';
+		skipGpuOpt.value('true', _('True'));
+		skipGpuOpt.value('false', _('False'));
+		
+		const gpuDevOpt = mainSect.taboption('other', form.Value, 'intel_gpu_device', _('Specify -d value for intel_gpu_top'), 
+			_('Specify the device name (e.g., card0). Defaults to card0 if unset.'));
+		gpuDevOpt.placeholder = 'card0';
+		gpuDevOpt.rmempty = true;
+		gpuDevOpt.depends('skip_gpu', 'false');
+
+		const skipSystemdOpt = mainSect.taboption('other', form.ListValue, 'skip_systemd', _('Disable Systemd service monitoring'));
+		skipSystemdOpt.default = 'false';
+		skipSystemdOpt.value('true', _('True'));
+		skipSystemdOpt.value('false', _('False'));
 
 		const rendered = await map.render();
 
