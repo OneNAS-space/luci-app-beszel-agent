@@ -165,8 +165,8 @@ return view.extend({
 		logLevelOpt.value('error', _('Error'));
 
 		if (isX86) {
-			const skipGpuOpt = mainSect.taboption('other', form.ListValue, 'skip_gpu', _('Skip GPU')),
-				_('Disable GPU Monitoring.');
+			const skipGpuOpt = mainSect.taboption('other', form.ListValue, 'skip_gpu', _('Skip GPU'),
+				_('Disable GPU Monitoring.'));
 			skipGpuOpt.default = 'false';
 			skipGpuOpt.value('true', _('True'));
 			skipGpuOpt.value('false', _('False'));
