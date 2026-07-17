@@ -9,9 +9,6 @@
 
 const POLL_INTERVAL = 5;
 
-const RUNNING_SPAN = `<span style="color: green; font-weight: bold">${_('Running')}</span>`;
-const NOT_RUNNING_SPAN = `<span style="color: red; font-weight: bold">${_('Not running')}</span>`;
-
 function getServiceInfo(name) {
 	const fn = rpc.declare({
 		object: 'service',
@@ -55,7 +52,9 @@ async function getVersion() {
 }
 
 function getStatusValue(isRunning) {
-	return isRunning ? RUNNING_SPAN : NOT_RUNNING_SPAN;
+	const runningSpan = `<span style="color: green; font-weight: bold">${_('Running')}</span>`;
+	const notRunningSpan = `<span style="color: red; font-weight: bold">${_('Not running')}</span>`;
+	return isRunning ? runningSpan : notRunningSpan;
 }
 
 function updateStatus(node) {
@@ -139,6 +138,16 @@ return view.extend({
 		hubOpt.placeholder = 'http://hub.example.com:8090';
 		hubOpt.attrs = { autocomplete: 'off' };
 		hubOpt.rmempty = false;
+		hubOpt.validate = (section_id, value) => {
+			if (!value)
+				return true;
+
+			// scheme (required) + host (IPv4 / IPv6 / hostname) + optional port + optional path
+			const urlPattern = /^https?:\/\/(\[[0-9a-fA-F:]+\]|[a-zA-Z0-9.-]+)(:\d{1,5})?(\/[^\s]*)?$/;
+			return urlPattern.test(value)
+				? true
+				: _('Must be a valid URL, e.g. http://hub.example.com:8090');
+		};
 
 		const keyOpt = mainSect.taboption('general', form.Value, 'key', _('Public Key'), _('Public SSH key (if using SSH-based auth).'));
 		keyOpt.placeholder = 'ssh-ed25519 ...';
@@ -293,7 +302,6 @@ return view.extend({
 					inp.addEventListener('change', updateEnableUI);
 				});
 				updateEnableUI();
-				setTimeout(updateEnableUI, 100);
 			}
 		}
 
