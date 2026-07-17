@@ -74,12 +74,15 @@ return view.extend({
 			getStatus(),
 			getVersion(),
 			getBoardInfo().catch(() => ({})),
+			fs.list('/sys/class/drm').catch(() => []),
 		]);
 	},
 
-	async render([isRunning, versionText, boardInfo]) {
+	async render([isRunning, versionText, boardInfo, drmList]) {
 		const target = boardInfo?.release?.target || '';
 		const isX86 = target.startsWith('x86');
+		const hasCardNode = drmList && drmList.some(item => /^card\d+$/.test(item.name));
+		const showGpuOptions = isX86 && hasCardNode;
 
 		const map = new form.Map('beszel-agent', _('Beszel Agent'),
 			_('Lightweight telemetry agent for reporting system and Docker metrics to your Beszel Hub.'));
@@ -164,7 +167,7 @@ return view.extend({
 		logLevelOpt.value('warn', _('Warn'));
 		logLevelOpt.value('error', _('Error'));
 
-		if (isX86) {
+		if (showGpuOptions) {
 			const skipGpuOpt = mainSect.taboption('other', form.ListValue, 'skip_gpu', _('Skip GPU'),
 				_('Disable GPU Monitoring.'));
 			skipGpuOpt.default = 'false';
