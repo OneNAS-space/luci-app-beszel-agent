@@ -184,6 +184,10 @@ return view.extend({
 		skipSystemdOpt.value('true', _('True'));
 		skipSystemdOpt.value('false', _('False'));
 
+		const dockerHostOpt = mainSect.taboption('other', form.Value, 'docker_host', _('DOCKER_HOST'),
+			_('Overrides the Docker host (docker.sock).<br>Leave empty to completely disable Docker monitoring.'));
+		dockerHostOpt.rmempty = true;
+
 		const rendered = await map.render();
 
 		const style = document.createElement('style');
