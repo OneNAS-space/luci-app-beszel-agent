@@ -165,19 +165,21 @@ return view.extend({
 		logLevelOpt.value('error', _('Error'));
 
 		if (isX86) {
-			const skipGpuOpt = mainSect.taboption('other', form.ListValue, 'skip_gpu', _('Disable GPU Monitoring'));
+			const skipGpuOpt = mainSect.taboption('other', form.ListValue, 'skip_gpu', _('Skip GPU')),
+				_('Disable GPU Monitoring.');
 			skipGpuOpt.default = 'false';
 			skipGpuOpt.value('true', _('True'));
 			skipGpuOpt.value('false', _('False'));
 
-			const gpuDevOpt = mainSect.taboption('other', form.Value, 'intel_gpu_device', _('Specify -d value for intel_gpu_top'), 
+			const gpuDevOpt = mainSect.taboption('other', form.Value, 'intel_gpu_device', _('INTEL_GPU_DEVICE'), 
 				_('Specify the device name (e.g., card0). Defaults to card0 if unset.'));
 			gpuDevOpt.placeholder = 'card0';
 			gpuDevOpt.rmempty = true;
 			gpuDevOpt.depends('skip_gpu', 'false');
 		}
 
-		const skipSystemdOpt = mainSect.taboption('other', form.ListValue, 'skip_systemd', _('Disable Systemd service monitoring'));
+		const skipSystemdOpt = mainSect.taboption('other', form.ListValue, 'skip_systemd', _('Skip Systemd'),
+			_('Disable Systemd service monitoring.'));
 		skipSystemdOpt.default = 'false';
 		skipSystemdOpt.value('true', _('True'));
 		skipSystemdOpt.value('false', _('False'));
