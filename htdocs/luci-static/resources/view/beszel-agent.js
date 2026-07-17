@@ -22,6 +22,11 @@ function getServiceInfo(name) {
 	return () => fn(name);
 }
 
+const getBoardInfo = rpc.declare({
+	object: 'system',
+	method: 'board',
+});
+
 const getBeszelAgentInfo = getServiceInfo('beszel-agent');
 
 async function getStatus() {
@@ -68,10 +73,14 @@ return view.extend({
 		return Promise.all([
 			getStatus(),
 			getVersion(),
+			getBoardInfo().catch(() => ({})),
 		]);
 	},
 
-	async render([isRunning, versionText]) {
+	async render([isRunning, versionText, boardInfo]) {
+		const target = boardInfo?.release?.target || '';
+		const isX86 = target.startsWith('x86');
+
 		const map = new form.Map('beszel-agent', _('Beszel Agent'),
 			_('Lightweight telemetry agent for reporting system and Docker metrics to your Beszel Hub.'));
 
@@ -155,16 +164,18 @@ return view.extend({
 		logLevelOpt.value('warn', _('Warn'));
 		logLevelOpt.value('error', _('Error'));
 
-		const skipGpuOpt = mainSect.taboption('other', form.ListValue, 'skip_gpu', _('Disable GPU Monitoring'));
-		skipGpuOpt.default = 'false';
-		skipGpuOpt.value('true', _('True'));
-		skipGpuOpt.value('false', _('False'));
-		
-		const gpuDevOpt = mainSect.taboption('other', form.Value, 'intel_gpu_device', _('Specify -d value for intel_gpu_top'), 
-			_('Specify the device name (e.g., card0). Defaults to card0 if unset.'));
-		gpuDevOpt.placeholder = 'card0';
-		gpuDevOpt.rmempty = true;
-		gpuDevOpt.depends('skip_gpu', 'false');
+		if (isX86) {
+			const skipGpuOpt = mainSect.taboption('other', form.ListValue, 'skip_gpu', _('Disable GPU Monitoring'));
+			skipGpuOpt.default = 'false';
+			skipGpuOpt.value('true', _('True'));
+			skipGpuOpt.value('false', _('False'));
+
+			const gpuDevOpt = mainSect.taboption('other', form.Value, 'intel_gpu_device', _('Specify -d value for intel_gpu_top'), 
+				_('Specify the device name (e.g., card0). Defaults to card0 if unset.'));
+			gpuDevOpt.placeholder = 'card0';
+			gpuDevOpt.rmempty = true;
+			gpuDevOpt.depends('skip_gpu', 'false');
+		}
 
 		const skipSystemdOpt = mainSect.taboption('other', form.ListValue, 'skip_systemd', _('Disable Systemd service monitoring'));
 		skipSystemdOpt.default = 'false';
