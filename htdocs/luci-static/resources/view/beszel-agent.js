@@ -9,9 +9,6 @@
 
 const POLL_INTERVAL = 5;
 
-const RUNNING_SPAN = `<span style="color: green; font-weight: bold">${_('Running')}</span>`;
-const NOT_RUNNING_SPAN = `<span style="color: red; font-weight: bold">${_('Not running')}</span>`;
-
 function getServiceInfo(name) {
 	const fn = rpc.declare({
 		object: 'service',
@@ -21,6 +18,11 @@ function getServiceInfo(name) {
 	});
 	return () => fn(name);
 }
+
+const getBoardInfo = rpc.declare({
+	object: 'system',
+	method: 'board',
+});
 
 const getBeszelAgentInfo = getServiceInfo('beszel-agent');
 
@@ -50,7 +52,9 @@ async function getVersion() {
 }
 
 function getStatusValue(isRunning) {
-	return isRunning ? RUNNING_SPAN : NOT_RUNNING_SPAN;
+	const runningSpan = `<span style="color: green; font-weight: bold">${_('Running')}</span>`;
+	const notRunningSpan = `<span style="color: red; font-weight: bold">${_('Not running')}</span>`;
+	return isRunning ? runningSpan : notRunningSpan;
 }
 
 function updateStatus(node) {
@@ -68,10 +72,17 @@ return view.extend({
 		return Promise.all([
 			getStatus(),
 			getVersion(),
+			getBoardInfo().catch(() => ({})),
+			fs.list('/sys/class/drm').catch(() => []),
 		]);
 	},
 
-	async render([isRunning, versionText]) {
+	async render([isRunning, versionText, boardInfo, drmList]) {
+		const target = boardInfo?.release?.target || '';
+		const isX86 = target.startsWith('x86');
+		const hasCardNode = drmList && drmList.some(item => /^card\d+$/.test(item.name));
+		const showGpuOptions = isX86 && hasCardNode;
+
 		const map = new form.Map('beszel-agent', _('Beszel Agent'),
 			_('Lightweight telemetry agent for reporting system and Docker metrics to your Beszel Hub.'));
 
@@ -91,22 +102,52 @@ return view.extend({
 		mainSect.addremove = false;
 
 		mainSect.tab('general', _('General Settings'));
+		mainSect.tab('network', _('Network Settings'), _('Configure network interface monitoring rules.'));
 		mainSect.tab('mounts', _('Extra Disks'), _('Configure extra disks for Beszel Agent to monitor.'));
+		mainSect.tab('other', _('Other Settings'), _('Advanced and others configurations.'));
 
 		const enableOpt = mainSect.taboption('general', form.Flag, 'enable', _('Enable'));
 		enableOpt.default = '0';
 		enableOpt.rmempty = false;
 
-		const portOpt = mainSect.taboption('general', form.Value, 'port', _('Port'), _('Listening port for the agent.'));
+		const sysNameOpt = mainSect.taboption('general', form.Value, 'system_name', _('System Name'), 
+			_('Override system name on universal token registration.<br>Defaults to hostname if unset.'));
+		sysNameOpt.placeholder = 'OpenWrt';
+		sysNameOpt.rmempty = true;
+
+		const listenOpt = mainSect.taboption('general', form.Value, 'listen', _('Listen'), 
+			_('IP address, port, or unix socket<br>(e.g., 0.0.0.0:45876 or [::]:45876). Replaces Port.'));
+		listenOpt.placeholder = '0.0.0.0:45876';
+		listenOpt.rmempty = true;
+
+		const portOpt = mainSect.taboption('general', form.Value, 'port', _('Port (Deprecated)'), 
+			_('Maintained for backward compatibility.<br>Will be cleared if Listen is configured.'));
 		portOpt.datatype = 'port';
 		portOpt.default = '45876';
 		portOpt.placeholder = '45876';
-		portOpt.rmempty = false;
+		portOpt.rmempty = true;
+		portOpt.write = function(section_id, formvalue) {
+			const listenVal = this.section.formvalue(section_id, 'listen');
+			if (listenVal && listenVal.trim() !== '') {
+				return this.super('remove', [section_id]);
+			}
+			return this.super('write', [section_id, formvalue]);
+		};
 
 		const hubOpt = mainSect.taboption('general', form.Value, 'hub_url', _('Hub URL'), _('The URL of your Beszel Hub.'));
 		hubOpt.placeholder = 'http://hub.example.com:8090';
 		hubOpt.attrs = { autocomplete: 'off' };
 		hubOpt.rmempty = false;
+		hubOpt.validate = (section_id, value) => {
+			if (!value)
+				return true;
+
+			// scheme (required) + host (IPv4 / IPv6 / hostname) + optional port + optional path
+			const urlPattern = /^https?:\/\/(\[[0-9a-fA-F:]+\]|[a-zA-Z0-9.-]+)(:\d{1,5})?(\/[^\s]*)?$/;
+			return urlPattern.test(value)
+				? true
+				: _('Must be a valid URL, e.g. http://hub.example.com:8090');
+		};
 
 		const keyOpt = mainSect.taboption('general', form.Value, 'key', _('Public Key'), _('Public SSH key (if using SSH-based auth).'));
 		keyOpt.placeholder = 'ssh-ed25519 ...';
@@ -116,10 +157,48 @@ return view.extend({
 		tokenOpt.password = true;
 		tokenOpt.rmempty = false;
 
+		// --- Network Settings  ---
+		const nicsOpt = mainSect.taboption('network', form.DynamicList, 'nics', _('Interface Filters (NICS)'),
+			_('Specify network interfaces to monitor or exclude.<br>Prefix with "-" to blacklist (e.g., "-phy*", "-*ap*").<br>Leave empty to use default filtering.'));
+		nicsOpt.placeholder = '-phy*';
+
+		// --- Extra Disks  ---
 		const extraFsOpt = mainSect.taboption('mounts', form.DynamicList, 'extra_filesystems', _('Extra Filesystems'),
 			_('Specify additional mount points to monitor (e.g., /mnt/sda1).'));
 		extraFsOpt.placeholder = '/mnt/sda1';
 		extraFsOpt.validate = (section_id, value) => (!value || value.startsWith('/')) ? true : _('Path must be absolute (must start with /).');
+
+		// --- Other Settings  ---
+		const logLevelOpt = mainSect.taboption('other', form.ListValue, 'log_level', _('Log Level'));
+		logLevelOpt.default = 'info';
+		logLevelOpt.value('debug', _('Debug'));
+		logLevelOpt.value('info', _('Info'));
+		logLevelOpt.value('warn', _('Warn'));
+		logLevelOpt.value('error', _('Error'));
+
+		if (showGpuOptions) {
+			const skipGpuOpt = mainSect.taboption('other', form.ListValue, 'skip_gpu', _('Skip GPU'),
+				_('(True) to Disable GPU monitoring.'));
+			skipGpuOpt.default = 'false';
+			skipGpuOpt.value('true', _('True'));
+			skipGpuOpt.value('false', _('False'));
+
+			const gpuDevOpt = mainSect.taboption('other', form.Value, 'intel_gpu_device', _('Intel GPU Device'), 
+				_('Specify the device name (e.g., card0). Defaults to card0 if unset.'));
+			gpuDevOpt.placeholder = 'card0';
+			gpuDevOpt.rmempty = true;
+			gpuDevOpt.depends('skip_gpu', 'false');
+		}
+
+		const skipSystemdOpt = mainSect.taboption('other', form.ListValue, 'skip_systemd', _('Skip Systemd'),
+			_('(True) to Disable Systemd service monitoring.'));
+		skipSystemdOpt.default = 'false';
+		skipSystemdOpt.value('true', _('True'));
+		skipSystemdOpt.value('false', _('False'));
+
+		const dockerHostOpt = mainSect.taboption('other', form.Value, 'docker_host', _('Docker HOST'),
+			_('Overrides the Docker host (docker.sock).<br>Leave empty to completely disable Docker monitoring.'));
+		dockerHostOpt.rmempty = true;
 
 		const rendered = await map.render();
 
@@ -128,17 +207,43 @@ return view.extend({
 		rendered.appendChild(style);
 
 		const enableRow = rendered.querySelector('.cbi-value[id$="-enable"]');
+		const listenRow = rendered.querySelector('.cbi-value[id$="-listen"]');
 		const portRow = rendered.querySelector('.cbi-value[id$="-port"]');
 		const hubRow = rendered.querySelector('.cbi-value[id$="-hub_url"]');
 		const tokenRow = rendered.querySelector('.cbi-value[id$="-token"]');
 		const keyRow = rendered.querySelector('.cbi-value[id$="-key"]');
 
-		if (enableRow && portRow && hubRow && tokenRow && keyRow) {
+		if (enableRow && hubRow && tokenRow && keyRow && (listenRow || portRow)) {
 			const fieldContainer = enableRow.querySelector('.cbi-value-field');
-			const portInput = portRow.querySelector('input');
+			const listenInput = listenRow ? listenRow.querySelector('input') : null;
+			const portInput = portRow ? portRow.querySelector('input') : null;
 			const hubInput = hubRow.querySelector('input');
 			const tokenInput = tokenRow.querySelector('input');
 			const keyInput = keyRow.querySelector('input');
+
+			if (listenInput && portInput && portRow) {
+				function handleListenVisibility() {
+					const hasListen = listenInput.value.trim() !== '';
+					if (hasListen) {
+						if (portInput.value !== '') {
+							portInput.value = '';
+							portInput.dispatchEvent(new Event('input', { bubbles: true }));
+						}
+						portRow.style.display = 'none';
+					} else {
+						portRow.style.display = '';
+					}
+				}
+				listenInput.addEventListener('input', handleListenVisibility);
+				handleListenVisibility();
+				portInput.addEventListener('input', () => {
+					if (portInput.value.trim() !== '' && listenInput.value !== '') {
+						listenInput.value = '';
+						listenInput.dispatchEvent(new Event('input', { bubbles: true }));
+						handleListenVisibility(); 
+					}
+				});
+			}
 
 			if (fieldContainer && portInput && hubInput && tokenInput && keyInput) {
 				const warningNode = document.createElement('div');
@@ -149,13 +254,14 @@ return view.extend({
 				fieldContainer.prepend(warningNode);
 
 				function updateEnableUI() {
-					const hasPort = portInput.value.trim().length > 0;
+					const hasListen = listenInput && listenInput.value.trim().length > 0;
+					const hasPort = portInput && portInput.value.trim().length > 0;
 					const hasHub = hubInput.value.trim().length > 0;
 					const hasToken = tokenInput.value.trim().length > 0;
 					const hasKey = keyInput.value.trim().length > 0;
 					
 					const missing = [];
-					if (!hasPort) missing.push(_('Port'));
+					if (!hasListen && !hasPort) missing.push(_('Listen (or Port)'));
 					if (!hasHub) missing.push(_('Hub URL'));
 					if (!hasToken) missing.push(_('Token'));
 					if (!hasKey) missing.push(_('Public Key'));
@@ -190,12 +296,12 @@ return view.extend({
 						}
 					});
 				}
-				[portInput, hubInput, tokenInput, keyInput].forEach(inp => {
+				const inputs = [listenInput, portInput, hubInput, tokenInput, keyInput].filter(Boolean);
+				inputs.forEach(inp => {
 					inp.addEventListener('input', updateEnableUI);
 					inp.addEventListener('change', updateEnableUI);
 				});
 				updateEnableUI();
-				setTimeout(updateEnableUI, 100);
 			}
 		}
 
