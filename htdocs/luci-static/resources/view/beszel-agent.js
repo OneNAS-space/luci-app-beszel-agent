@@ -178,12 +178,12 @@ return view.extend({
 
 		if (showGpuOptions) {
 			const skipGpuOpt = mainSect.taboption('other', form.ListValue, 'skip_gpu', _('Skip GPU'),
-				_('Disable GPU Monitoring.'));
+				_('(True) to Disable GPU monitoring.'));
 			skipGpuOpt.default = 'false';
 			skipGpuOpt.value('true', _('True'));
 			skipGpuOpt.value('false', _('False'));
 
-			const gpuDevOpt = mainSect.taboption('other', form.Value, 'intel_gpu_device', _('INTEL_GPU_DEVICE'), 
+			const gpuDevOpt = mainSect.taboption('other', form.Value, 'intel_gpu_device', _('Intel GPU Device'), 
 				_('Specify the device name (e.g., card0). Defaults to card0 if unset.'));
 			gpuDevOpt.placeholder = 'card0';
 			gpuDevOpt.rmempty = true;
@@ -191,12 +191,12 @@ return view.extend({
 		}
 
 		const skipSystemdOpt = mainSect.taboption('other', form.ListValue, 'skip_systemd', _('Skip Systemd'),
-			_('Disable Systemd service monitoring.'));
+			_('(True) to Disable Systemd service monitoring.'));
 		skipSystemdOpt.default = 'false';
 		skipSystemdOpt.value('true', _('True'));
 		skipSystemdOpt.value('false', _('False'));
 
-		const dockerHostOpt = mainSect.taboption('other', form.Value, 'docker_host', _('DOCKER_HOST'),
+		const dockerHostOpt = mainSect.taboption('other', form.Value, 'docker_host', _('Docker HOST'),
 			_('Overrides the Docker host (docker.sock).<br>Leave empty to completely disable Docker monitoring.'));
 		dockerHostOpt.rmempty = true;
 
