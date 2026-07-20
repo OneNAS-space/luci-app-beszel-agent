@@ -183,11 +183,18 @@ return view.extend({
 			skipGpuOpt.value('true', _('True'));
 			skipGpuOpt.value('false', _('False'));
 
+			const gpuCollOpt = mainSect.taboption('other', form.ListValue, 'gpu_collector', _('GPU Collector'),
+				_('If Agent fails automatically detect it, please choose one according to your GPU.'));
+			gpuCollOpt.value('', _('Auto Detect (Default)'));
+			gpuCollOpt.value('intel_gpu_top', _('Intel GPUs'));
+			gpuCollOpt.value('amd_sysfs', _('AMD GPUs'));
+			gpuCollOpt.depends('skip_gpu', 'false');
+
 			const gpuDevOpt = mainSect.taboption('other', form.Value, 'intel_gpu_device', _('Intel GPU Device'), 
 				_('Specify the device name (e.g., card0). Defaults to card0 if unset.'));
 			gpuDevOpt.placeholder = 'card0';
 			gpuDevOpt.rmempty = true;
-			gpuDevOpt.depends('skip_gpu', 'false');
+			gpuDevOpt.depends({ skip_gpu: 'false', gpu_collector: 'intel_gpu_top' });
 		}
 
 		const skipSystemdOpt = mainSect.taboption('other', form.ListValue, 'skip_systemd', _('Skip Systemd'),
