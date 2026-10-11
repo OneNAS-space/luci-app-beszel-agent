@@ -169,6 +169,12 @@ return view.extend({
 		extraFsOpt.validate = (section_id, value) => (!value || value.startsWith('/')) ? true : _('Path must be absolute (must start with /).');
 
 		// --- Other Settings  ---
+		const dataDirOpt = mainSect.taboption('other', form.Value, 'data_dir', _('Data Directory'),
+			_('Directory to store system fingerprint and local data. Defaults to /etc/beszel-agent if unset.'));
+		dataDirOpt.placeholder = '/etc/beszel-agent';
+		dataDirOpt.default = '/etc/beszel-agent';
+		dataDirOpt.rmempty = true;
+
 		const logLevelOpt = mainSect.taboption('other', form.ListValue, 'log_level', _('Log Level'));
 		logLevelOpt.default = 'info';
 		logLevelOpt.value('debug', _('Debug'));
