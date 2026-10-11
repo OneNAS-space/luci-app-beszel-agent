@@ -169,6 +169,13 @@ return view.extend({
 		extraFsOpt.validate = (section_id, value) => (!value || value.startsWith('/')) ? true : _('Path must be absolute (must start with /).');
 
 		// --- Other Settings  ---
+		const bootDelayOpt = mainSect.taboption('other', form.Value, 'boot_delay', _('Boot Delay'),
+			_('Delay in seconds before starting the agent on system boot to allow network and DNS to settle. Defaults to 15 if unset.'));
+		bootDelayOpt.datatype = 'uinteger';
+		bootDelayOpt.default = '15';
+		bootDelayOpt.placeholder = '15';
+		bootDelayOpt.rmempty = true;
+
 		const dataDirOpt = mainSect.taboption('other', form.Value, 'data_dir', _('Data Directory'),
 			_('Directory to store system fingerprint and local data. Defaults to /etc/beszel-agent if unset.'));
 		dataDirOpt.placeholder = '/etc/beszel-agent';
